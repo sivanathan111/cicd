@@ -1,0 +1,282 @@
+Project Overview: Internal Brain Research Platform with AWS and DevOps
+1. Institution Background
+
+The Sudha Gopalakrishnan Brain Centre (SGBC) is a multidisciplinary brain research centre at the Indian Institute of Technology Madras (IIT Madras), Chennai.
+
+The centre works at the intersection of neuroscience, medicine, engineering, imaging technology, and computational research. Its main research objective is to study the structure and organization of the human brain at very high resolution, including cellular-level details.
+
+The centre uses advanced brain-imaging and computational techniques to create detailed digital representations of human brains. Its research includes studying brain structure, cellular organization, connectivity, development, aging, and disease.
+
+What kind of data does the institution work with?
+
+Structural MRI: Magnetic resonance imaging provides information about brain structure at a larger anatomical scale.
+
+Histology images: Brain tissue is processed into thin sections, stained using specialized techniques, and scanned at high resolution. Different stains help researchers observe different cellular and tissue structures.
+
+Serial brain sections: A brain is divided into many thin sections. Each section is digitized, and researchers can align and analyze the images to reconstruct three-dimensional representations.
+
+Multimodal imaging: Different imaging methods and staining techniques provide complementary information about the same brain or brain region.
+
+Three-dimensional brain atlases: Digitized sections and associated information can be aligned and reconstructed into 3D representations that researchers can explore and annotate.
+
+SGBC's published work includes large-scale, high-resolution brain datasets. For example, the DHARANI project released 5,132 digitized sections of a developing human brain. The centre also describes a high-throughput histology and computational pipeline designed for very large imaging datasets.
+
+Official references:
+
+SGBC: https://sgbc.humanbrain.in/
+IIT Madras: https://www.iitm.ac.in/
+DHARANI brain atlas information: https://brainportal.humanbrain.in/publicview/index.html
+2. Project Purpose
+
+The proposed project is an internal research web platform that helps researchers access brain-imaging datasets, explore images, perform image analysis, create annotations, and ask questions about approved research documents.
+
+The platform is intended to provide a common interface for different research workflows rather than requiring every researcher to interact directly with physical servers, individual analysis scripts, or separate command-line tools.
+
+The proposed application serves approximately 70–80 internal users across three groups:
+
+Researchers
+Annotation team
+Scanning team
+
+This user count is an assumption for the proposed project, not a publicly verified SGBC figure.
+
+The website is accessible only through the institute's internal network or an approved VPN. It is not intended to be a publicly accessible application.
+
+3. Main Application Features
+A. Researcher Dashboard
+
+Researchers sign in and see the datasets and tools they are authorized to access.
+
+The dashboard can provide:
+
+Available brain datasets and their metadata.
+Links to MRI and histology images.
+Image-viewing and annotation tools.
+Image-analysis and similarity-search functions.
+Processing-job status and results.
+A research assistant for questions about approved documents.
+
+The dashboard is built with Angular, while the backend APIs handle authentication, authorization, data retrieval, and communication with analysis services.
+
+B. Brain Image Viewer
+
+Researchers need to explore brain images at different scales, from a complete section to smaller cellular-level details.
+
+The viewer should support functions such as:
+
+Loading a selected brain section.
+Zooming and navigating large images.
+Selecting a particular dataset or section.
+Displaying associated metadata.
+Showing annotations over the image.
+Navigating between related sections when the necessary data is available.
+
+High-resolution histology images can be extremely large. A practical viewer may use tiled images or image pyramids, which allow the browser to load only the required image region and resolution instead of downloading the entire full-resolution image at once.
+
+This viewing optimization is separate from ML inference. A viewer may need image tiles even when no ML algorithm is running.
+
+C. Image Annotation
+
+Researchers and the annotation team can create or review annotations associated with a brain image.
+
+An annotation might identify a region of interest, a structure, a cellular feature, or another research-relevant area.
+
+The application needs to maintain:
+
+The dataset and image-section reference.
+Annotation coordinates or geometry.
+Annotation category or label.
+User and timestamp information.
+Review status, where applicable.
+The relationship between annotations and the corresponding image.
+
+The exact annotation format and database are design decisions. For example, annotation geometry might be represented using a structured format such as GeoJSON when its coordinate model is suitable. Large image files themselves should not be stored directly inside ordinary relational database records.
+
+D. Image Similarity and Other ML Tools
+
+The platform provides access to image-analysis algorithms. One example is image similarity: a researcher selects an image or region, and the system finds similar images or regions from an authorized collection.
+
+Other algorithms could support image classification, segmentation, feature extraction, or other research workflows, depending on the actual scientific requirements.
+
+These are separate analytical tasks, even though they may be accessed from the same website.
+
+The website does not need to execute heavy ML calculations inside the browser. Instead, the backend submits requests to an ML inference service and returns the results.
+
+For example:
+
+The researcher selects an image.
+The backend checks the user's permissions and validates the request.
+The backend provides the image reference and required inputs to the ML service.
+The ML service runs the selected algorithm.
+The result is returned or stored for later retrieval.
+The frontend displays the result.
+
+Long-running analysis should be handled as a background job rather than keeping a browser request open indefinitely.
+
+E. Research LLM Assistant
+
+The application includes a proposed LLM-powered assistant for answering questions about approved research documents, internal documentation, and related material.
+
+A possible implementation is retrieval-augmented generation (RAG). The system retrieves relevant document passages and provides them as context to the language model.
+
+For example, a researcher could ask a question about an approved research protocol or an internal document and receive an answer based on the retrieved material.
+
+The LLM is a separate capability from the image-analysis ML models. The LLM handles language and document-based questions; image-analysis models process images.
+
+The LLM hosting option has not been decided. It could use a managed model service or a privately hosted model. The document-retrieval pipeline, model choice, permissions, and hosting approach should be selected based on actual requirements.
+
+4. Proposed Hybrid Infrastructure
+
+The project uses a proposed hybrid architecture: some research data and compute remain on physical servers, while selected application workloads run on AWS.
+
+This is a design assumption for the learning project, not a statement about SGBC's confirmed production infrastructure.
+
+On-premises infrastructure
+
+Physical servers retain the original brain-imaging datasets. Physical GPU servers perform model training and can continue to handle computationally demanding research workloads.
+
+Keeping the original data on-premises means the AWS application does not automatically need to copy every original dataset into the cloud.
+
+AWS application infrastructure
+
+The application runs inside an AWS VPC. The website is accessed through approved private connectivity, such as the institute network or an approved VPN.
+
+The proposed AWS architecture includes:
+
+An internal Application Load Balancer.
+Application EC2 instances running the frontend and backend.
+A separate EC2 instance for ML inference, with GPU capability if testing shows it is required.
+A private S3 bucket for selected working copies, approved outputs, and model artifacts.
+A database for annotation metadata and application records.
+CloudWatch for monitoring and logs.
+IAM roles and security groups for access control.
+
+The initial application design uses two application EC2 instances across two Availability Zones to improve availability. The number of instances can be adjusted according to actual performance and availability requirements.
+
+The ML inference tier starts with one suitable instance. It should not be assumed that one GPU instance can run every algorithm concurrently or process every full-resolution dataset efficiently. Model memory, image dimensions, batch sizes, and concurrent requests must be tested.
+
+Data transfer between physical servers and AWS
+
+The proposed design uses AWS DataSync to transfer selected datasets from an on-premises source to S3.
+
+A configured transfer workflow identifies the source and destination, transfers approved files, and reports progress or failures.
+
+Only the required datasets should be transferred for the intended AWS workflow. The original files remain on the physical servers under this design.
+
+DataSync is a proposed implementation choice; it should not be represented as a confirmed existing SGBC service without evidence.
+
+Model training and inference
+
+Training and inference are different activities.
+
+Training: A model learns from research data and produces model weights and other artifacts. The proposed project performs this on physical GPU servers.
+Inference: A trained model is used to analyze a new input. The proposed project deploys suitable trained models to the AWS inference EC2 instance.
+
+A possible workflow is to transfer approved model artifacts to S3, then deploy them to the inference service. The application backend sends requests to that service through private network access.
+
+This separation allows the website to provide model-based tools without requiring the application EC2 instance to perform all the heavy image-analysis work itself.
+
+5. AWS Security
+
+Because the platform handles research datasets and annotations, access should be restricted at multiple levels.
+
+VPC and private subnets: Keep application and inference resources off the public internet.
+Internal ALB: Accept application traffic through approved internal connectivity.
+Security groups: Restrict network access between the ALB, application instances, inference service, and database.
+IAM roles: Give each AWS workload only the permissions it needs.
+Private S3 bucket: Block public access and use appropriate bucket policies.
+Encryption: Protect data at rest and in transit.
+Secrets management: Store credentials and API secrets in an appropriate secret-management service rather than in source code.
+Application authorization: Verify that each user can access the requested dataset and perform the requested action.
+CloudTrail and CloudWatch: Record AWS activity and monitor application health and errors.
+Backups and recovery: Protect important application records and test restoration procedures.
+
+Network permissions and data permissions are different. A researcher might be able to reach the website but still lack permission to access a particular dataset.
+
+6. DevOps and CI/CD
+
+Jenkins is responsible for both Continuous Integration (CI) and Continuous Delivery/Deployment (CD).
+
+The application source code is stored in Git, such as GitHub. Developers push changes, and Jenkins runs the configured pipeline.
+
+Application pipeline
+A developer pushes code to the repository.
+Jenkins checks out the code.
+Automated tests and configured security checks run.
+The frontend and backend are built.
+Docker images are built if container packaging is used.
+Images are pushed to Amazon ECR.
+The tested release is deployed to development.
+Staging validation is performed.
+Production deployment proceeds after the required approval.
+Health checks and CloudWatch monitoring verify the release.
+
+The same tested artifact should be promoted through the environments rather than rebuilt independently for production.
+
+Terraform and infrastructure management
+
+Terraform manages the infrastructure configuration, such as the VPC, subnets, security groups, EC2 resources, IAM roles, and other selected AWS components.
+
+Infrastructure changes use a separate controlled workflow:
+
+Update Terraform configuration.
+Run formatting and validation.
+Generate and review a Terraform plan.
+Approve the changes where required.
+Apply the approved changes.
+Verify the resulting infrastructure.
+
+Terraform can be executed by Jenkins, but routine application releases should not automatically change the entire infrastructure.
+
+Docker and ECR
+
+Docker packages the application and its dependencies into deployable images. Amazon ECR stores the images.
+
+If the chosen deployment approach uses Docker on EC2, the deployment process retrieves the approved image and restarts the application using the release configuration.
+
+Kubernetes and EKS are not part of this project design.
+
+Deployment and rollback
+
+The deployment process should verify application health after releasing a new version. If the release fails, deployment should stop and the previous known-good version should be restored where possible.
+
+With multiple application instances behind an ALB, instances can be updated incrementally. A successful rollback also depends on compatible configuration and database changes.
+
+7. Monitoring and Operations
+
+CloudWatch is used to monitor application and infrastructure behavior.
+
+Useful monitoring areas include:
+
+EC2 health and CPU usage.
+Application errors and API latency.
+Disk and memory metrics where configured.
+Failed deployments and health checks.
+ML job failures and processing duration.
+Resource utilization during image-analysis workloads.
+
+CloudTrail records AWS API activity, helping investigate changes to infrastructure and permissions.
+
+The application should also provide useful logs for API errors, failed jobs, and image-processing problems without exposing credentials or unnecessary sensitive information.
+
+For the large imaging workloads, monitoring should help determine whether the system needs larger instances, more inference workers, better caching, or improved image tiling.
+
+8. Scope and Assumptions
+
+The following are part of the proposed learning design:
+
+Internal research website with approximately 70–80 users.
+Angular frontend and backend APIs.
+Research image viewer and annotation workflows.
+Similarity search and other model-based analysis tools.
+An LLM-based assistant for approved research documents.
+Original datasets and model training on physical servers.
+Selected working copies and model artifacts in private S3.
+AWS EC2 application and ML inference tiers.
+Jenkins for CI/CD, Docker for packaging, ECR for image storage, and Terraform for infrastructure.
+CloudWatch and CloudTrail for monitoring and auditing.
+No Kubernetes/EKS or Argo CD.
+
+The exact backend framework, database engine, LLM hosting option, image formats, algorithms, GPU size, and data-transfer configuration remain open until requirements are established.
+
+Public information about SGBC supports the research context—high-resolution whole-brain imaging, histology, structural MRI, 3D reconstruction, and large-scale computational analysis. It does not verify this particular AWS architecture, the assumed internal user count, or the proposed application features.

@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+db.sqlite3
+
+# Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+
+# Local tools and logs
+.codex/
+*.log

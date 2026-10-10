@@ -1,0 +1,176 @@
+﻿CODEX REQUIREMENTS
+
+1. Goal and Teaching Approach
+
+Learn CI/CD using a minimal Angular frontend and Django backend, following the
+Jenkins CI and Argo CD GitOps pattern in the user's brief for Abhishek
+Veeramalla's "Ultimate CI/CD" video.
+
+Keep the application simple and develop production-grade pipeline practices
+incrementally. A working learning demo alone is not a production-ready platform.
+Explain each step in simple English, state why it is needed before commands,
+and provide one command or file-edit step at a time. Wait for the user's result;
+"d" means done. Do not expand application functionality to teach the pipeline.
+
+This document replaces the previous requirements. require.txt is institutional
+background only and does not define this application's features or architecture.
+The video details below are supplied by the user, not independently verified.
+
+2. Application Scope
+
+- Angular: one page displaying a message fetched from the backend.
+- Django: /api/hello/ returns {"message": "Hello from Django"}.
+- No ML, RAG assistant, dataset workflows, authentication feature, or advanced UI.
+- PostgreSQL is an optional later learning exercise, not a current prerequisite.
+- No institutional data, VPN, on-premises integration, or DataSync requirement.
+- Reuse the existing frontend and backend rather than rebuild them.
+
+3. Architecture: Separate CI and CD
+
+Application Git repository -> Jenkins CI -> Docker Hub images
+                                     -> Manifest update committed to Git
+Manifest Git path -> Argo CD -> Kubernetes -> Frontend and backend workloads
+
+Jenkins builds, tests, scans, publishes images, and updates desired image versions
+in Git. Jenkins does not run kubectl or deploy application workloads directly.
+Argo CD watches the configured Git repository/path and reconciles Kubernetes
+with the committed manifests. Git is the source of truth for desired deployment
+configuration. Kubernetes runs separately from Jenkins's build-agent containers.
+
+4. Jenkins CI Workflow
+
+1. A developer pushes application changes to main. Start with manual Build Now
+   if needed; then configure a GitHub webhook to trigger Jenkins.
+2. Configure Pipeline script from SCM and set the Jenkinsfile Script Path.
+3. Use disposable Docker agents through the Jenkins Docker Pipeline plugin.
+   Provide Node/npm, Python/pip, Docker CLI/build access, and SonarScanner through
+   one suitable agent image or separate agents per stage/stack.
+4. Ensure source checkout is available. Do not duplicate Jenkins's automatic
+   checkout unless the chosen agent/workspace arrangement requires it.
+5. Install frontend dependencies with npm ci using package-lock.json. Install
+   backend dependencies from requirements.txt in an isolated environment.
+6. Build Angular and run frontend tests in non-interactive CI mode. Run Django
+   tests using manage.py test initially; pytest with pytest-django is an option.
+   Angular produces static files in dist/. Django has no Maven-style jar build.
+7. Run static analysis using sonar-scanner and sonar-project.properties, passing
+   the SonarQube URL and token securely. Enforce the configured quality gate.
+8. Build two Docker images: frontend and backend.
+9. Tag each image with the Jenkins build number for the reference exercise and
+   push both to separate Docker Hub repositories. Keep source-commit traceability
+   and avoid overwriting published release tags.
+10. Update both image references in Kubernetes manifests using a checked-in
+    script. Validate the changes and commit/push using a scoped Git credential.
+    Update manifests only after both images have been published successfully.
+11. Prevent manifest-only commits from retriggering an endless build loop. Handle
+    concurrent manifest updates without silently overwriting another release.
+
+Temporary agent containers are cleaned up after execution. A Docker CLI inside
+an agent still needs an explicit connection to a Docker daemon/build service;
+choose and explain that arrangement and its host permissions before setup.
+
+5. Docker Packaging
+
+- frontend/Dockerfile: multi-stage build with Node, then serve Angular static
+  files using nginx. Configure /api/ routing to the backend appropriately.
+- backend/Dockerfile: install Python dependencies and run Django using Gunicorn.
+- Use .dockerignore files to exclude local environments, dependencies, secrets,
+  caches, and unrelated generated files from build contexts.
+- Normal source changes rebuild images; Dockerfiles change only when packaging
+  or runtime requirements change.
+- Local Angular proxy configuration is for development; deployed nginx routing
+  must be configured separately.
+
+6. Argo CD and Kubernetes Delivery
+
+- Create two Deployments and two Services, one each for frontend and backend.
+- Decide how to expose the frontend; ingress is optional.
+- Configure an Argo CD Application with the Git URL, revision, manifests path,
+  destination cluster, and namespace.
+- Enable automatic sync for the learning flow. Explain self-heal and pruning
+  separately before choosing their settings.
+- Demonstrate a new Git image-tag commit being deployed by Argo CD.
+- Demonstrate drift after a manual cluster change and its reconciliation.
+- Demonstrate rollback by reverting desired image versions in Git and syncing.
+- Jenkins has no application-deployment kubectl stage or cluster credentials.
+- Add resource requests/limits, readiness/liveness checks, and rollout validation
+  as the pipeline is hardened.
+
+7. Reference Setup and Adaptation Decisions
+
+The user's video brief describes:
+- Jenkins and SonarQube on one Ubuntu EC2 t2.large instance.
+- Jenkins on port 8080 and SonarQube on port 9000.
+- Docker Engine installed with access for jenkins and ubuntu users.
+- Docker Pipeline plugin for Jenkins container agents.
+- Jenkins credential IDs: sonarqube (secret text), docker-cred (username/password),
+  and github (secret text personal access token).
+- A separate Minikube cluster; Argo CD installed using OLM and the Argo CD operator.
+- Argo CD automatic sync targeting a manifests path and the default namespace.
+- A manifest-editing shell script instead of Image Updater.
+- Hardcoded non-secret values to simplify the demo.
+
+Use these as reference details, not unquestioned production defaults. Confirm
+current compatible software versions, installation methods, machine capacity,
+and costs when implementing. Credentials must be stored securely, not hardcoded.
+Administrative interfaces should have restricted access.
+
+AWS remains the intended infrastructure setting for the learning project.
+The exact Kubernetes location (local Minikube or a separate AWS host), instance
+sizes, region, access setup, and budget remain to be chosen. EKS is not required.
+The previous direct-to-EC2 application deployment and ECR plan are superseded by
+Kubernetes delivery through Argo CD and Docker Hub for this reference pipeline.
+Terraform can be added for infrastructure automation later; it is not a required
+stage of this first reference implementation.
+
+8. Repository Layout
+
+Use the existing monorepo as the initial application layout:
+
+frontend/                   Angular application and frontend Dockerfile
+backend/                    Django application, tests, and backend Dockerfile
+Jenkinsfile                 CI pipeline definition
+sonar-project.properties    Static analysis configuration
+scripts/                    Validated image-reference update script
+manifests/                  Kubernetes desired deployment configuration
+codex_requirements.txt      This learning brief
+require.txt                 Institutional context only
+
+A separate GitOps repository is an option. Decide before implementing manifest
+pushes; if manifests stay in the monorepo, configure trigger/path filtering.
+Commit package.json and package-lock.json for Angular and requirements.txt for
+Python. Keep secrets out of source control, image layers, and logs.
+
+9. Production-Grade Pipeline Practices to Learn
+
+- Reproducible dependency installation, controlled tool versions, and traceable
+  immutable release images.
+- Meaningful automated tests, linting, SonarQube gates, dependency scanning,
+  secret scanning, and container-image scanning.
+- Least-privilege credentials and controlled access to the Docker build host.
+- Pipeline timeouts, concurrency handling, useful logs, and retained test reports.
+- Validate manifests before committing desired deployment changes.
+- Health checks, rollout observation, and Git-based rollback.
+- Later environment promotion reuses tested images; production approval must
+  occur before changing the Git revision/path watched by production Argo CD.
+
+Automatic sync in the learning environment does not replace approval controls
+for a later production environment. Implement the reference flow first, then
+add and verify these controls without expanding the dummy application.
+
+10. Completion Evidence
+
+- Angular displays the Django message when deployed on Kubernetes.
+- Jenkins uses disposable Docker agents and reads the Jenkinsfile from SCM.
+- A failed test or enforced quality gate blocks image release/manifest updates.
+- A successful build publishes both images and commits both intended image tags.
+- Argo CD deploys the committed versions without Jenkins running kubectl.
+- Git history and image metadata identify the source of a deployed release.
+- Drift detection and Git-based rollback are demonstrated.
+
+11. Current Learning Checkpoint
+
+The user reported the dummy application works locally, the Django test passes,
+the Angular build succeeds, and the backend Docker image has been built.
+Running and checking the backend container is the next unconfirmed step.
+Frontend Docker packaging, Jenkins, SonarQube, Kubernetes manifests, and Argo CD
+setup have not yet been confirmed complete. Inspect actual files when resuming.
