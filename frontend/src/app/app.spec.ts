@@ -1,24 +1,53 @@
 import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: 'Hello from Django' }),
+      }),
+    );
+
     await TestBed.configureTestingModule({
       imports: [App],
-    })
-      .compileComponents();
+    }).compileComponents();
   });
 
-  it('should create the app', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('should render title', async () => {
+  it('displays the title and backend message', async () => {
     const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, frontend');
+    fixture.detectChanges();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('Hello from Django');
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('h1').textContent,
+    ).toContain('CI/CD Demo');
+
+    expect(fetch).toHaveBeenCalledWith('/api/hello/');
+  });
+
+  it('displays an error when the backend is unreachable', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('Connection failed'));
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain(
+        'Cannot connect to Django',
+      );
+    });
   });
 });
